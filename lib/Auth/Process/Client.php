@@ -59,29 +59,39 @@ class sspmod_attrauthgocdb_Auth_Process_Client extends SimpleSAML_Auth_Processin
         }
     }
 
+    /**
+     * @param array $state
+     */
     public function process(&$state)
     {
         try {
             assert('is_array($state)');
-            $subjectIds = array();
-            foreach ($this->config['subject_attributes'] as $subjectAttribute) {
-                if (!empty($state['Attributes'][$subjectAttribute])) {
-                    $subjectIds = array_merge($subjectIds,
-                        $state['Attributes'][$subjectAttribute]);
-                }
-            }
+            $subjectAttributes = $this->config['subject_attributes'];
+            $subjectIds = array_filter($state['Attributes'], static function ($key) use ($subjectAttributes){
+              return in_array($key, $subjectAttributes);
+            }, ARRAY_FILTER_USE_KEY);
+            // INFO: Array spread operator does not support associative arrays. That's why we use array_values first
+            $subjectIds = array_merge(...array_values($subjectIds));
             if (empty($subjectIds)) {
                 SimpleSAML_Logger::debug("[attrauthgocdb]"
-                    ." Skipping query to GOCDB AA at "
-                    .$this->config['api_base_path']
-                    .": No attribute(s) named '"
+                    . " Skipping query to GOCDB AA at "
+                    . $this->config['api_base_path']
+                    . ": No attribute(s) named '"
                     . var_export($this->config['subject_attributes'], true)
-                    ."' in state information.");
+                    . "' in state information.");
                 return;
             }
+
             $t0 = round(microtime(true) * 1000); // TODO
             foreach ($subjectIds as $subjectId) {
-                $newAttributes = $this->getAttributes($subjectId);
+                list($newAttributes, $http_response) = $this->getAttributes($subjectId);
+                if (!empty($http_response) && $http_response != 200) {
+                  // Save state and redirect
+                  $state['attrauthgocdb:error_msg'] = $newAttributes;
+                  $id = SimpleSAML_Auth_State::saveState($state, 'attrauthgocdb:error_state');
+                  $url = SimpleSAML_Module::getModuleURL('attrauthgocdb/user_in_form.php');
+                  \SimpleSAML\Utils\HTTP::redirectTrustedURL($url, array('StateId' => $id));
+                }
                 SimpleSAML_Logger::debug("[attrauthgocdb]"
                     ." process: newAttributes="
                     .var_export($newAttributes, true));
@@ -100,26 +110,31 @@ class sspmod_attrauthgocdb_Auth_Process_Client extends SimpleSAML_Auth_Processin
                     );
                 }
             }
-            $t1 = round(microtime(true) * 1000); // TODO 
-            SimpleSAML_Logger::debug(
-                "[attrauthgocdb] process: dt=" . var_export($t1-$t0, true) . "msec");
+            $t1 = round(microtime(true) * 1000); // TODO
+            SimpleSAML_Logger::debug("[attrauthgocdb] process: dt=" . var_export($t1-$t0, true) . "msec");
         } catch (\Exception $e) {
             $this->showException($e);
         }
 
     }
 
+    /**
+     * @param $subjectId
+     * @return array
+     * @throws SimpleSAML_Error_Exception
+     */
     public function getAttributes($subjectId)
     {
-        SimpleSAML_Logger::debug('[attrauthgocdb] getAttributes: subjectId='
-            . var_export($subjectId, true));
+        SimpleSAML_Logger::debug('[attrauthgocdb] getAttributes: subjectId=' . var_export($subjectId, true));
 
         $attributes = array();
 
         // Construct GOCDB API URL
-        $url = $this->config['api_base_path'] . '/?method=get_user&dn=' 
-            . urlencode($subjectId);
-        $data = $this->http('GET', $url);
+        $url = $this->config['api_base_path'] . '/?method=get_user&dn=' . urlencode($subjectId);
+        list($data, $http_response) = $this->http('GET', $url);
+        if (!empty($http_response) && $http_response != 200) {
+          return array($data, $http_response);
+        }
         while ($data->count() >= 1 && !empty($data->{'EGEE_USER'}->{'USER_ROLE'})) {
             if (!array_key_exists($this->config['role_attribute'], $attributes)) {
                 $attributes[$this->config['role_attribute']] = array();
@@ -144,10 +159,16 @@ class sspmod_attrauthgocdb_Auth_Process_Client extends SimpleSAML_Auth_Processin
             if (!empty($pageMeta['next'])) {
                 $data = $this->http('GET', $pageMeta['next']);
             }
-        } 
-        return $attributes;
+        }
+
+        return array($attributes, $http_response);
     }
 
+    /**
+     * @param $method
+     * @param $url
+     * @return array
+     */
     private function http($method, $url)
     {
         SimpleSAML_Logger::debug("[attrauthgocdb] http: method="
@@ -173,14 +194,21 @@ class sspmod_attrauthgocdb_Auth_Process_Client extends SimpleSAML_Auth_Processin
 
         // Check for error; not even redirects are allowed here
         if ($http_response !== 200) {
-            SimpleSAML_Logger::error("[attrauthgocdb] API request failed: HTTP response code: "
-                . $http_response . ", error message: '" . curl_error($ch)) . "'";
-            throw new SimpleSAML_Error_Exception("API request failed");
+            $response = json_decode($response, true);
+            SimpleSAML_Logger::error("[attrauthgocdb] API request failed: HTTP response code: " . $http_response . ", error message: '" . $response['Error']['Message']) . "'";
+            $data[] = $response['Error']['Message'];
+        } else {
+            $data[] = new SimpleXMLElement($response);
+
         }
-        $data = new SimpleXMLElement($response);
+        $data[] = $http_response;
         return $data;
     }
 
+    /**
+     * @param $response
+     * @return array
+     */
     private function getPageMeta($response)
     {
         SimpleSAML_Logger::debug("[attrauthgocdb] getPageMeta: response="
@@ -207,6 +235,10 @@ class sspmod_attrauthgocdb_Auth_Process_Client extends SimpleSAML_Auth_Processin
         return $result;
     }
 
+    /**
+     * @param $e
+     * @throws Exception
+     */
     private function showException($e)
     {
         $globalConfig = SimpleSAML_Configuration::getInstance();

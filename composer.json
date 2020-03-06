@@ -1,0 +1,25 @@
+{
+    "name": "rciam/simplesamlphp-module-attrauthgocdb",
+    "description": "A SimpleSAMLphp module for fetching user's roles from GOCDB",
+    "type": "simplesamlphp-module",
+    "keywords": ["gocdb","simplesamlphp","rciam"],
+    "license": "Apache License 2.0",
+    "authors": [
+       {
+         "name": "Nicolas Liampotis",
+         "email": "nliam@grnet.gr"
+       },
+       {
+          "name": "Ioannis Igoumenos",
+          "email": "ioigoume@gmail.com"
+        }
+    ],
+    "require": {
+        "simplesamlphp/composer-module-installer": "~1.0",
+        "php": ">=5.6"
+    },
+    "support": {
+        "issues": "https://github.com/rciam/simplesamlphp-module-attrauthgocdb/issues",
+        "source": "https://github.com/rciam/simplesamlphp-module-attrauthgocdb"
+    }
+}

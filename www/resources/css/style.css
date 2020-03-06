@@ -1,0 +1,64 @@
+fieldset {
+    padding: 0px;
+}
+
+fieldset legend {
+    background: #eee;
+}
+
+h3#attributeheader {
+    margin: 1.5em 0em 0.5em 0em;
+}
+
+table#table_with_attributes .attrname {
+    text-align: right;
+    font-weight: bold;
+}
+
+table#table_with_attributes .attrvalue {
+    padding-left: 1em;
+    margin: 0.5em 0em;
+}
+
+table#table_with_attributes tr:last-child td {
+    border-bottom: none;
+}
+
+table#table_with_attributes img {
+    border: 1px solid #777;
+    margin: 4px;
+}
+
+table#table_with_attributes ul {
+    margin: 0px;
+    padding-left: 1em;
+}
+
+.info, .success, .warning, .error, .validation {
+    border: 1px solid;
+    margin: 10px 0px;
+    padding:15px 10px 15px 50px;
+    background-repeat: no-repeat;
+    background-position: 10px center;
+}
+/* CSS Style for notification boxes*/
+.info {
+    color: #00529B;
+    background-color: #BDE5F8;
+    background-image: url('../../resources/icons/info.png');
+}
+.success {
+    color: #4F8A10;
+    background-color: #DFF2BF;
+    background-image:url('../../resources/icons/success.png');
+}
+.warning {
+    color: #9F6000;
+    background-color: #FEEFB3;
+    background-image: url('../../resources/icons/warning.png');
+}
+.error {
+    color: #D8000C;
+    background-color: #FFBABA;
+    background-image: url('../../resources/icons/error.png');
+}
